@@ -25,6 +25,14 @@ router.post('/', async (req, res) => {
   res.status(201).json(blog)
 })
 
+// PUT /api/blogs/:id - update likes of a blog
+router.put('/:id', blogFinder, async (req, res) => {
+  const blog = req.blog
+  blog.likes = req.body.likes
+  await blog.save()
+  res.json(blog)
+})
+
 // DELETE /api/blogs/:id - delete a blog by ID
 router.delete('/:id', blogFinder, async (req, res) => {
   await req.blog.destroy()
@@ -32,3 +40,4 @@ router.delete('/:id', blogFinder, async (req, res) => {
 })
 
 module.exports = router
+
