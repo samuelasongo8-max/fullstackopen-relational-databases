@@ -1,1 +1,4 @@
+
 .ai-code-tracker.json
+.env
+node_modules/
