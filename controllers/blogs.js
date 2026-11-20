@@ -1,28 +1,47 @@
 const express = require('express')
-const { Blog } = require('../models')
+const jwt = require('jsonwebtoken')
+const { Blog, User } = require('../models')
 
 const router = express.Router()
 
-// Middleware to find blog by ID
-const blogFinder = async (req, res, next) => {
-  const blog = await Blog.findByPk(req.params.id)
-  if (!blog) {
-    return res.status(404).end()
+// Middleware to extract user from token
+const tokenExtractor = (request, response, next) => {
+  const authorization = request.get('authorization')
+  if (authorization && authorization.startsWith('Bearer ')) {
+    const token = authorization.replace('Bearer ', '')
+    jwt.verify(token, process.env.SECRET, (error, decoded) => {
+      if (error) {
+        return response.status(401).json({ error: 'invalid token' })
+      }
+      request.decodedToken = decoded
+      next()
+    })
+  } else {
+    response.status(401).json({ error: 'missing token' })
   }
-  req.blog = blog
+}
+
+// Middleware to find user from token
+const userExtractor = async (request, response, next) => {
+  if (request.decodedToken && request.decodedToken.id) {
+    const user = await User.findByPk(request.decodedToken.id)
+    request.user = user
+  }
   next()
 }
 
-// GET /api/blogs - retrieve all blogs
-router.get('/', async (req, res) => {
-  const blogs = await Blog.findAll()
-  res.json(blogs)
-})
-
 // POST /api/blogs - create a new blog
-router.post('/', async (req, res, next) => {
+router.post('/', tokenExtractor, userExtractor, async (req, res, next) => {
   try {
-    const blog = await Blog.create(req.body)
+    const user = request.user
+    if (!user) {
+      return res.status(401).json({ error: 'unknown user' })
+    }
+    const blog = await Blog.create({
+      title: req.body.title,
+      url: req.body.url,
+      userId: user.id
+    })
     res.status(201).json(blog)
   } catch (error) {
     next(error)
@@ -30,9 +49,12 @@ router.post('/', async (req, res, next) => {
 })
 
 // PUT /api/blogs/:id - update likes of a blog
-router.put('/:id', blogFinder, async (req, res, next) => {
+router.put('/:id', async (req, res, next) => {
   try {
-    const blog = req.blog
+    const blog = await Blog.findByPk(req.params.id)
+    if (!blog) {
+      return res.status(404).end()
+    }
     blog.likes = req.body.likes
     await blog.save()
     res.json(blog)
@@ -42,9 +64,17 @@ router.put('/:id', blogFinder, async (req, res, next) => {
 })
 
 // DELETE /api/blogs/:id - delete a blog by ID
-router.delete('/:id', blogFinder, async (req, res) => {
-  await req.blog.destroy()
-  res.status(204).end()
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const blog = await Blog.findByPk(req.params.id)
+    if (!blog) {
+      return res.status(404).end()
+    }
+    await blog.destroy()
+    res.status(204).end()
+  } catch (error) {
+    next(error)
+  }
 })
 
 module.exports = router

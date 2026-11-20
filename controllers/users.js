@@ -1,16 +1,42 @@
 const express = require('express')
+const jwt = require('jsonwebtoken')
 const { User } = require('../models')
+const bcrypt = require('bcryptjs')
 
 const router = express.Router()
 
 // POST /api/users - create new user
 router.post('/', async (req, res, next) => {
   try {
-    // Extract only name and username explicitly to ignore password or other fields
-    const { name, username } = req.body
-    const userFields = { name, username }
-    const user = await User.create(userFields)
+    const { name, username, password } = req.body
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' })
+    }
+    const user = await User.create({ name, username, password })
     res.status(201).json(user)
+  } catch (error) {
+    next(error)
+  }
+})
+
+// POST /api/login - login
+router.post('/login', async (req, res, next) => {
+  try {
+    const { username, password } = req.body
+    const user = await User.findOne({ where: { username } })
+    if (!user) {
+      return res.status(401).json({ error: 'invalid username or password' })
+    }
+    const passwordCorrect = await user.correctPassword(password)
+    if (!passwordCorrect) {
+      return res.status(401).json({ error: 'invalid username or password' })
+    }
+    const userForToken = {
+      username: user.username,
+      id: user.id
+    }
+    const token = jwt.sign(userForToken, process.env.SECRET)
+    res.json({ token, username: user.username, name: user.name })
   } catch (error) {
     next(error)
   }

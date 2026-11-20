@@ -3,15 +3,18 @@ const { DataTypes } = require('sequelize')
 const { sequelize } = require('../util/db')
 
 const Blog = sequelize.define('blog', {
-  author: {
-    type: DataTypes.TEXT
-  },
-  url: {
-    type: DataTypes.TEXT,
+  title: {
+    type: DataTypes.STRING,
     allowNull: false
   },
-  title: {
-    type: DataTypes.TEXT,
+  userId: {
+    type: DataTypes.INTEGER
+  },
+  author: {
+    type: DataTypes.STRING
+  },
+  url: {
+    type: DataTypes.STRING,
     allowNull: false
   },
   likes: {

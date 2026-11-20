@@ -11,6 +11,29 @@ app.use(express.json())
 app.use('/api/blogs', blogsRouter)
 app.use('/api/users', usersRouter)
 
+// Login route
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body
+    const user = await User.findOne({ where: { username } })
+    if (!user) {
+      return res.status(401).json({ error: 'invalid username or password' })
+    }
+    const passwordCorrect = await user.correctPassword(password)
+    if (!passwordCorrect) {
+      return res.status(401).json({ error: 'invalid username or password' })
+    }
+    const userForToken = {
+      username: user.username,
+      id: user.id
+    }
+    const token = jwt.sign(userForToken, process.env.SECRET)
+    res.json({ token, username: user.username, name: user.name })
+  } catch (error) {
+    next(error)
+  }
+})
+
 const { errorHandler } = require('./util/middleware')
 
 // Centralized error handling middleware
