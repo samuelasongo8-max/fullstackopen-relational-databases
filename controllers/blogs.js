@@ -20,17 +20,25 @@ router.get('/', async (req, res) => {
 })
 
 // POST /api/blogs - create a new blog
-router.post('/', async (req, res) => {
-  const blog = await Blog.create(req.body)
-  res.status(201).json(blog)
+router.post('/', async (req, res, next) => {
+  try {
+    const blog = await Blog.create(req.body)
+    res.status(201).json(blog)
+  } catch (error) {
+    next(error)
+  }
 })
 
 // PUT /api/blogs/:id - update likes of a blog
-router.put('/:id', blogFinder, async (req, res) => {
-  const blog = req.blog
-  blog.likes = req.body.likes
-  await blog.save()
-  res.json(blog)
+router.put('/:id', blogFinder, async (req, res, next) => {
+  try {
+    const blog = req.blog
+    blog.likes = req.body.likes
+    await blog.save()
+    res.json(blog)
+  } catch (error) {
+    next(error)
+  }
 })
 
 // DELETE /api/blogs/:id - delete a blog by ID

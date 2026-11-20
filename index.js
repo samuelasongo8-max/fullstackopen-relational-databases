@@ -8,6 +8,11 @@ const app = express()
 app.use(express.json())
 app.use('/api/blogs', blogsRouter)
 
+const { errorHandler } = require('./util/middleware')
+
+// Centralized error handling middleware
+app.use(errorHandler)
+
 const start = async () => {
   try {
     await connectToDatabase()
