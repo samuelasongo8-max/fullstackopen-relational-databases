@@ -7,7 +7,6 @@ const errorHandler = (error, request, response, next) => {
     error.name === 'SequelizeUniqueConstraintError'
   ) {
     const messages = error.errors.map(e => e.message)
-
     return response.status(400).json({ error: messages })
   }
 
