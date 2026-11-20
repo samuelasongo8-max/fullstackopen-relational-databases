@@ -1,6 +1,6 @@
 
 const { DataTypes } = require('sequelize')
-const sequelize = require('../util/db')
+const { sequelize } = require('../util/db')
 
 const Blog = sequelize.define('blog', {
   author: {
@@ -23,3 +23,4 @@ const Blog = sequelize.define('blog', {
 })
 
 module.exports = Blog
+
