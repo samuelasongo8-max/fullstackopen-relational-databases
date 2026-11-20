@@ -14,10 +14,15 @@ const User = sequelize.define('user', {
   username: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
+    unique: {
+      msg: 'username must be unique'
+    },
     validate: {
       notEmpty: {
         msg: 'Username must not be empty'
+      },
+      isEmail: {
+        msg: 'username must be a valid email address'
       }
     }
   }
