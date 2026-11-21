@@ -1,4 +1,5 @@
 const express = require('express')
+const jwt = require('jsonwebtoken')
 const config = require('./util/config')
 const { sequelize, connectToDatabase } = require('./util/db')
 const User = require('./models/user')
@@ -12,7 +13,7 @@ app.use('/api/blogs', blogsRouter)
 app.use('/api/users', usersRouter)
 
 // Login route
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', async (req, res, next) => {
   try {
     const { username, password } = req.body
     const user = await User.findOne({ where: { username } })
@@ -52,5 +53,9 @@ const start = async () => {
   }
 }
 
-start()
+if (process.env.NODE_ENV !== 'test') {
+  start()
+}
+
+module.exports = { app, start, sequelize }
 

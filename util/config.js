@@ -1,4 +1,4 @@
-require('dotenv').config()
+require('dotenv').config({ path: process.env.NODE_ENV === 'test' ? '.env.test' : '.env' })
 
 const {
   DB_NAME,
@@ -6,7 +6,8 @@ const {
   DB_PASSWORD,
   DB_HOST,
   DB_PORT,
-  PORT
+  PORT,
+  SECRET
 } = process.env
 
 module.exports = {
@@ -15,5 +16,6 @@ module.exports = {
   DB_PASSWORD,
   DB_HOST,
   DB_PORT,
-  PORT
+  PORT,
+  SECRET
 }

@@ -7,7 +7,12 @@
     "pg": "^8.23.1",
     "sequelize": "^6.37.8"
   },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
+  },
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "jest --verbose --forceExit --detectOpenHandles"
   }
 }

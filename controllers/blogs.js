@@ -24,8 +24,15 @@ const tokenExtractor = (request, response, next) => {
 // Middleware to find user from token
 const userExtractor = async (request, response, next) => {
   if (request.decodedToken && request.decodedToken.id) {
-    const user = await User.findByPk(request.decodedToken.id)
-    request.user = user
+    try {
+      const user = await User.findByPk(request.decodedToken.id)
+      if (!user) {
+        return response.status(401).json({ error: 'invalid token' })
+      }
+      request.user = user
+    } catch (error) {
+      return next(error)
+    }
   }
   next()
 }
@@ -33,7 +40,7 @@ const userExtractor = async (request, response, next) => {
 // POST /api/blogs - create a new blog
 router.post('/', tokenExtractor, userExtractor, async (req, res, next) => {
   try {
-    const user = request.user
+    const user = req.user
     if (!user) {
       return res.status(401).json({ error: 'unknown user' })
     }
@@ -64,11 +71,16 @@ router.put('/:id', async (req, res, next) => {
 })
 
 // DELETE /api/blogs/:id - delete a blog by ID
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', tokenExtractor, userExtractor, async (req, res, next) => {
   try {
     const blog = await Blog.findByPk(req.params.id)
     if (!blog) {
       return res.status(404).end()
+    }
+    if (Number(blog.userId) !== Number(req.user.id)) {
+      return res.status(403).json({
+        error: 'Forbidden: You are not the owner of this blog'
+      })
     }
     await blog.destroy()
     res.status(204).end()
