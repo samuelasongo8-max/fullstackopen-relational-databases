@@ -304,4 +304,108 @@ describe('Blog deletion ownership authorization', () => {
     expect(response.body[0].user).not.toHaveProperty('passwordHash')
     expect(response.body[0].user).not.toHaveProperty('password')
   })
+
+  // Exercise 13: Search
+  test('Test 10a: GET /api/blogs returns all blogs when no search parameter', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React' })
+    await createBlog(user, { title: 'Learning Node.js' })
+
+    const response = await request(app)
+      .get('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(Array.isArray(response.body)).toBe(true)
+    expect(response.body.length).toBe(2)
+  })
+
+  test('Test 10b: GET /api/blogs?search=react returns matching blogs', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React' })
+    await createBlog(user, { title: 'React and Node.js' })
+    await createBlog(user, { title: 'Learning JavaScript' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=react')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(Array.isArray(response.body)).toBe(true)
+    expect(response.body.length).toBe(2)
+    expect(response.body.some(b => b.title === 'Learning React')).toBe(true)
+    expect(response.body.some(b => b.title === 'React and Node.js')).toBe(true)
+    expect(response.body.some(b => b.title === 'Learning JavaScript')).toBe(false)
+  })
+
+  test('Test 10c: Search is case-insensitive', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React' })
+    await createBlog(user, { title: 'React and Node.js' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=REACT')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(2)
+  })
+
+  test('Test 10d: Search matches keyword anywhere in title', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React' })
+    await createBlog(user, { title: 'Introduction to React.js' })
+    await createBlog(user, { title: 'React Basics' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=react')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(3)
+  })
+
+  test('Test 10e: Blogs without matching keyword are excluded', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React' })
+    await createBlog(user, { title: 'Learning JavaScript' })
+    await createBlog(user, { title: 'Node.js Basics' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=react')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(1)
+    expect(response.body[0].title).toBe('Learning React')
+  })
+
+  test('Test 10f: Empty search parameter returns all blogs', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React' })
+    await createBlog(user, { title: 'Learning Node.js' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(2)
+  })
+
+  test('Test 10g: Search results include associated user information', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=react')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body[0].user).toBeDefined()
+    expect(response.body[0].user).toHaveProperty('id')
+    expect(response.body[0].user).toHaveProperty('name')
+    expect(response.body[0].user).toHaveProperty('username')
+    expect(response.body[0].user).not.toHaveProperty('passwordHash')
+  })
 })
