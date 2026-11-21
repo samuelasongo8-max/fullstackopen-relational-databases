@@ -36,7 +36,8 @@ describe('Blog deletion ownership authorization', () => {
       title: overrides.title || 'Test Blog',
       url: overrides.url || 'https://example.com/blog',
       userId: user.id,
-      author: overrides.author || user.name
+      author: overrides.author || user.name,
+      likes: overrides.likes !== undefined ? overrides.likes : 0
     })
   }
 
@@ -559,5 +560,152 @@ describe('Blog deletion ownership authorization', () => {
     expect(response.body[0].user).toHaveProperty('name')
     expect(response.body[0].user).toHaveProperty('username')
     expect(response.body[0].user).not.toHaveProperty('passwordHash')
+  })
+
+  // Exercise 15: Ordering by likes descending
+  test('Test 12a: Blogs are returned in descending order of likes', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Low Likes', author: 'Author A', likes: 2 })
+    await createBlog(user, { title: 'Medium Likes', author: 'Author B', likes: 15 })
+    await createBlog(user, { title: 'High Likes', author: 'Author C', likes: 25 })
+
+    const response = await request(app)
+      .get('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(3)
+    expect(response.body[0].title).toBe('High Likes')
+    expect(response.body[1].title).toBe('Medium Likes')
+    expect(response.body[2].title).toBe('Low Likes')
+  })
+
+  test('Test 12b: Blog with more likes appears before blog with fewer likes', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'First', author: 'Author A', likes: 10 })
+    await createBlog(user, { title: 'Second', author: 'Author B', likes: 5 })
+
+    const response = await request(app)
+      .get('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body[0].likes).toBeGreaterThan(response.body[1].likes)
+    expect(response.body[0].title).toBe('First')
+    expect(response.body[1].title).toBe('Second')
+  })
+
+  test('Test 12c: Blog with highest likes appears first', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'One', author: 'Author A', likes: 1 })
+    await createBlog(user, { title: 'Two', author: 'Author B', likes: 100 })
+    await createBlog(user, { title: 'Three', author: 'Author C', likes: 50 })
+
+    const response = await request(app)
+      .get('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body[0].title).toBe('Two')
+    expect(response.body[0].likes).toBe(100)
+  })
+
+  test('Test 12d: Blog with lowest likes appears last', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'One', author: 'Author A', likes: 100 })
+    await createBlog(user, { title: 'Two', author: 'Author B', likes: 50 })
+    await createBlog(user, { title: 'Three', author: 'Author C', likes: 1 })
+
+    const response = await request(app)
+      .get('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    const lastIndex = response.body.length - 1
+    expect(response.body[lastIndex].title).toBe('Three')
+    expect(response.body[lastIndex].likes).toBe(1)
+  })
+
+  test('Test 12e: Ordering works when searching by title', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'React Basics', author: 'Author A', likes: 5 })
+    await createBlog(user, { title: 'React Advanced', author: 'Author B', likes: 20 })
+    await createBlog(user, { title: 'Node.js Intro', author: 'Author C', likes: 10 })
+
+    const response = await request(app)
+      .get('/api/blogs?search=react')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(2)
+    expect(response.body[0].title).toBe('React Advanced')
+    expect(response.body[1].title).toBe('React Basics')
+    expect(response.body[0].likes).toBeGreaterThan(response.body[1].likes)
+  })
+
+  test('Test 12f: Ordering works when searching by author', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Blog A', author: 'John Smith', likes: 5 })
+    await createBlog(user, { title: 'Blog B', author: 'John Smith', likes: 20 })
+    await createBlog(user, { title: 'Blog C', author: 'Jane Doe', likes: 10 })
+
+    const response = await request(app)
+      .get('/api/blogs?search=john')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(2)
+    expect(response.body[0].title).toBe('Blog B')
+    expect(response.body[1].title).toBe('Blog A')
+    expect(response.body[0].likes).toBeGreaterThan(response.body[1].likes)
+  })
+
+  test('Test 12g: Ordering with zero likes blogs', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Zero Likes', author: 'Author A', likes: 0 })
+    await createBlog(user, { title: 'Some Likes', author: 'Author B', likes: 10 })
+
+    const response = await request(app)
+      .get('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body[0].title).toBe('Some Likes')
+    expect(response.body[1].title).toBe('Zero Likes')
+  })
+
+  test('Test 12h: Search results include associated user information with ordering', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React', author: 'John Doe', likes: 10 })
+
+    const response = await request(app)
+      .get('/api/blogs?search=react')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body[0].user).toBeDefined()
+    expect(response.body[0].user).toHaveProperty('id')
+    expect(response.body[0].user).toHaveProperty('name')
+    expect(response.body[0].user).toHaveProperty('username')
+    expect(response.body[0].user).not.toHaveProperty('passwordHash')
+  })
+
+  test('Test 12i: Ordering preserves all blogs regardless of like count', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Blog 1', author: 'Author A', likes: 0 })
+    await createBlog(user, { title: 'Blog 2', author: 'Author B', likes: 50 })
+    await createBlog(user, { title: 'Blog 3', author: 'Author C', likes: 25 })
+    await createBlog(user, { title: 'Blog 4', author: 'Author D', likes: 100 })
+
+    const response = await request(app)
+      .get('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(4)
+    expect(response.body[0].likes).toBe(100)
+    expect(response.body[1].likes).toBe(50)
+    expect(response.body[2].likes).toBe(25)
+    expect(response.body[3].likes).toBe(0)
   })
 })
