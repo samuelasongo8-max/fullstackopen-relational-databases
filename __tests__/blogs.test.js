@@ -408,4 +408,156 @@ describe('Blog deletion ownership authorization', () => {
     expect(response.body[0].user).toHaveProperty('username')
     expect(response.body[0].user).not.toHaveProperty('passwordHash')
   })
+
+  // Exercise 14: Better Search - title AND author fields
+  test('Test 11a: Keyword found in title returns the blog', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React', author: 'John Doe' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=react')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(1)
+    expect(response.body[0].title).toBe('Learning React')
+  })
+
+  test('Test 11b: Keyword found in author returns the blog', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'JavaScript Basics', author: 'Jamie Smith' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=jami')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(1)
+    expect(response.body[0].author).toBe('Jamie Smith')
+  })
+
+  test('Test 11c: Keyword found in either field returns the blog', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React', author: 'John Doe' })
+    await createBlog(user, { title: 'Node.js Guide', author: 'Jamie Smith' })
+    await createBlog(user, { title: 'Python Intro', author: 'Alice Brown' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=jami')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(1)
+    expect(response.body[0].author).toBe('Jamie Smith')
+  })
+
+  test('Test 11d: Keyword absent from both fields excludes the blog', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React', author: 'John Doe' })
+    await createBlog(user, { title: 'Node.js Guide', author: 'Jane Smith' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=python')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(0)
+  })
+
+  test('Test 11e: Search is case-insensitive in the title', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React', author: 'John Doe' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=REACT')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(1)
+  })
+
+  test('Test 11f: Search is case-insensitive in the author', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'JavaScript Basics', author: 'Jamie Smith' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=JAMIE')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(1)
+  })
+
+  test('Test 11g: Partial matching works in both fields', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Introduction to React.js', author: 'John Doe' })
+    await createBlog(user, { title: 'Node.js Guide', author: 'Jamie Smith' })
+
+    const titleMatch = await request(app)
+      .get('/api/blogs?search=ct.js')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    const authorMatch = await request(app)
+      .get('/api/blogs?search=ith')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(titleMatch.body.length).toBe(1)
+    expect(authorMatch.body.length).toBe(1)
+  })
+
+  test('Test 11h: A blog matching both fields is returned only once', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'React by Jamie', author: 'Jamie Smith' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=jamie')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(1)
+  })
+
+  test('Test 11i: GET /api/blogs still returns all blogs without search', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React', author: 'John Doe' })
+    await createBlog(user, { title: 'Node.js Guide', author: 'Jane Smith' })
+
+    const response = await request(app)
+      .get('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(2)
+  })
+
+  test('Test 11j: Empty search parameter returns all blogs', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React', author: 'John Doe' })
+    await createBlog(user, { title: 'Node.js Guide', author: 'Jane Smith' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body.length).toBe(2)
+  })
+
+  test('Test 11k: Search results include associated user information', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Learning React', author: 'John Doe' })
+
+    const response = await request(app)
+      .get('/api/blogs?search=react')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body[0].user).toBeDefined()
+    expect(response.body[0].user).toHaveProperty('id')
+    expect(response.body[0].user).toHaveProperty('name')
+    expect(response.body[0].user).toHaveProperty('username')
+    expect(response.body[0].user).not.toHaveProperty('passwordHash')
+  })
 })
