@@ -89,5 +89,21 @@ router.delete('/:id', tokenExtractor, userExtractor, async (req, res, next) => {
   }
 })
 
+// GET /api/blogs - return all blogs with their associated user
+router.get('/', async (req, res, next) => {
+  try {
+    const blogs = await Blog.findAll({
+      include: {
+        model: User,
+        attributes: ['id', 'name', 'username'],
+        as: 'user'
+      }
+    })
+    res.json(blogs)
+  } catch (error) {
+    next(error)
+  }
+})
+
 module.exports = router
 

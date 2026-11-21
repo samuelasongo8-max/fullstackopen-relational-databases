@@ -1,6 +1,6 @@
 const express = require('express')
 const jwt = require('jsonwebtoken')
-const { User } = require('../models')
+const { User, Blog } = require('../models')
 const bcrypt = require('bcryptjs')
 
 const router = express.Router()
@@ -42,10 +42,19 @@ router.post('/login', async (req, res, next) => {
   }
 })
 
-// GET /api/users - return all users
+// GET /api/users - return all users with their blogs
 router.get('/', async (req, res, next) => {
   try {
-    const users = await User.findAll()
+    const users = await User.findAll({
+      attributes: {
+        exclude: ['passwordHash']
+      },
+      include: {
+        model: Blog,
+        as: 'blogs',
+        attributes: { exclude: ['userId'] }
+      }
+    })
     res.json(users)
   } catch (error) {
     next(error)

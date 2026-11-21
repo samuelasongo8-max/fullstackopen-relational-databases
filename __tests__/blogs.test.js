@@ -102,16 +102,22 @@ describe('Blog deletion ownership authorization', () => {
 
   // Test 5: Valid token belonging to a deleted user
   test('Test 5: Valid token for deleted user receives HTTP 401', async () => {
-    const { user, token } = await createUserAndToken()
-    const blog = await createBlog(user)
+    const { user: userToDelete, token: deletedUserToken } = await createUserAndToken()
+    const { user: blogOwner } = await createUserAndToken({ username: 'blogowner@example.com' })
 
-    await User.destroy({ where: { id: user.id } })
+    // Create a blog owned by a different user (so it won't be cascade-deleted)
+    const blog = await createBlog(blogOwner)
+
+    // Delete the user's blogs first (due to foreign key constraint), then the user
+    await Blog.destroy({ where: { userId: userToDelete.id } })
+    await User.destroy({ where: { id: userToDelete.id } })
 
     const response = await request(app)
       .delete(`/api/blogs/${blog.id}`)
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${deletedUserToken}`)
       .expect(401)
 
+    // The blog still exists (owned by a different user)
     const existingBlog = await Blog.findByPk(blog.id)
     expect(existingBlog).not.toBeNull()
   })
@@ -180,14 +186,22 @@ describe('Blog deletion ownership authorization', () => {
     expect(response.body.userId).toBe(user.id)
   })
 
-  test('Test 8c: Blog listing endpoint returns 404 (not implemented)', async () => {
+  test('Test 8c: GET /api/blogs returns all blogs with associated users', async () => {
     const { user, token } = await createUserAndToken()
-    await createBlog(user)
+    await createBlog(user, { title: 'My Blog' })
 
     const response = await request(app)
       .get('/api/blogs')
       .set('Authorization', `Bearer ${token}`)
-      .expect(404)
+      .expect(200)
+
+    expect(Array.isArray(response.body)).toBe(true)
+    expect(response.body.length).toBeGreaterThan(0)
+    expect(response.body[0]).toHaveProperty('user')
+    expect(response.body[0].user).toHaveProperty('id')
+    expect(response.body[0].user).toHaveProperty('name')
+    expect(response.body[0].user).toHaveProperty('username')
+    expect(response.body[0].user).not.toHaveProperty('passwordHash')
   })
 
   test('Test 8d: Blog editing still works', async () => {
@@ -221,5 +235,73 @@ describe('Blog deletion ownership authorization', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ title: 'Orphan Blog', url: 'https://example.com/orphan' })
       .expect(401)
+  })
+
+  // Exercise 12: GET /api/users includes blogs
+  test('Test 9a: GET /api/users returns all users with their blogs', async () => {
+    const { user: userA } = await createUserAndToken({ username: 'usera@example.com' })
+    const { user: userB } = await createUserAndToken({ username: 'userb@example.com' })
+
+    await createBlog(userA, { title: 'Blog A' })
+    await createBlog(userA, { title: 'Blog B' })
+    await createBlog(userB, { title: 'Blog C' })
+
+    const response = await request(app)
+      .get('/api/users')
+      .expect(200)
+
+    expect(Array.isArray(response.body)).toBe(true)
+    expect(response.body.length).toBeGreaterThanOrEqual(2)
+
+    const userAResponse = response.body.find(u => u.username === 'usera@example.com')
+    expect(userAResponse).toBeDefined()
+    expect(userAResponse.blogs).toBeDefined()
+    expect(Array.isArray(userAResponse.blogs)).toBe(true)
+    expect(userAResponse.blogs.length).toBe(2)
+    expect(userAResponse.blogs[0]).toHaveProperty('id')
+    expect(userAResponse.blogs[0]).toHaveProperty('title')
+    expect(userAResponse.blogs[0]).toHaveProperty('url')
+    expect(userAResponse.blogs[0]).toHaveProperty('likes')
+    expect(userAResponse).not.toHaveProperty('passwordHash')
+  })
+
+  test('Test 9b: User without blogs is returned with empty blogs array', async () => {
+    const { user: userB } = await createUserAndToken({ username: 'noblogs@example.com' })
+
+    const response = await request(app)
+      .get('/api/users')
+      .expect(200)
+
+    const userBResponse = response.body.find(u => u.username === 'noblogs@example.com')
+    expect(userBResponse).toBeDefined()
+    expect(userBResponse.blogs).toBeDefined()
+    expect(Array.isArray(userBResponse.blogs)).toBe(true)
+    expect(userBResponse.blogs.length).toBe(0)
+  })
+
+  test('Test 9c: User blogs do not include userId foreign key', async () => {
+    const { user: userA } = await createUserAndToken({ username: 'blogsuser@example.com' })
+    await createBlog(userA, { title: 'Blog X' })
+
+    const response = await request(app)
+      .get('/api/users')
+      .expect(200)
+
+    const userAResponse = response.body.find(u => u.username === 'blogsuser@example.com')
+    expect(userAResponse.blogs.length).toBeGreaterThan(0)
+    expect(userAResponse.blogs[0]).not.toHaveProperty('userId')
+  })
+
+  test('Test 9d: GET /api/blogs includes user without passwordHash', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user)
+
+    const response = await request(app)
+      .get('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(response.body[0].user).not.toHaveProperty('passwordHash')
+    expect(response.body[0].user).not.toHaveProperty('password')
   })
 })
