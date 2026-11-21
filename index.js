@@ -2,7 +2,9 @@ const express = require('express')
 const jwt = require('jsonwebtoken')
 const config = require('./util/config')
 const { sequelize, connectToDatabase } = require('./util/db')
+const { Sequelize } = require('sequelize')
 const User = require('./models/user')
+const Blog = require('./models/blog')
 const blogsRouter = require('./controllers/blogs')
 const usersRouter = require('./controllers/users')
 
@@ -35,11 +37,35 @@ app.post('/api/login', async (req, res, next) => {
   }
 })
 
-const { errorHandler } = require('./util/middleware')
+// GET /api/authors - return authors with blog counts and total likes
+app.get('/api/authors', async (req, res, next) => {
+  try {
+    const authors = await Blog.findAll({
+      attributes: [
+        'author',
+        [Sequelize.fn('COUNT', Sequelize.col('id')), 'blogs'],
+        [Sequelize.fn('SUM', Sequelize.col('likes')), 'likes']
+      ],
+      group: 'author',
+      order: [[Sequelize.fn('SUM', Sequelize.col('likes')), 'DESC']],
+      raw: true
+    })
+    const formattedAuthors = authors.map(author => ({
+      author: author.author,
+      blogs: String(author.blogs),
+      likes: String(author.likes)
+    }))
+    res.json(formattedAuthors)
+  } catch (error) {
+    next(error)
+  }
+})
 
 // Centralized error handling middleware
+const { errorHandler } = require('./util/middleware')
 app.use(errorHandler)
 
+// Only start the server when not in test mode
 const start = async () => {
   try {
     await connectToDatabase()
@@ -57,5 +83,5 @@ if (process.env.NODE_ENV !== 'test') {
   start()
 }
 
+// Export app and sequelize for testing
 module.exports = { app, start, sequelize }
-

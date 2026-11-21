@@ -708,4 +708,122 @@ describe('Blog deletion ownership authorization', () => {
     expect(response.body[2].likes).toBe(25)
     expect(response.body[3].likes).toBe(0)
   })
+
+  // Exercise 16: Authors aggregation
+  test('Test 13a: GET /api/authors returns HTTP 200', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Blog 1', author: 'Author A', likes: 10 })
+    await createBlog(user, { title: 'Blog 2', author: 'Author A', likes: 20 })
+    await createBlog(user, { title: 'Blog 3', author: 'Author B', likes: 5 })
+
+    const response = await request(app)
+      .get('/api/authors')
+      .expect(200)
+
+    expect(Array.isArray(response.body)).toBe(true)
+  })
+
+  test('Test 13b: Response has correct structure (author, blogs, likes)', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Blog 1', author: 'Author A', likes: 10 })
+    await createBlog(user, { title: 'Blog 2', author: 'Author A', likes: 20 })
+
+    const response = await request(app)
+      .get('/api/authors')
+      .expect(200)
+
+    expect(response.body[0]).toHaveProperty('author')
+    expect(response.body[0]).toHaveProperty('blogs')
+    expect(response.body[0]).toHaveProperty('likes')
+  })
+
+  test('Test 13c: Blog count is correct for author with multiple blogs', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Blog 1', author: 'Author A', likes: 10 })
+    await createBlog(user, { title: 'Blog 2', author: 'Author A', likes: 20 })
+
+    const response = await request(app)
+      .get('/api/authors')
+      .expect(200)
+
+    const authorA = response.body.find(a => a.author === 'Author A')
+    expect(authorA).toBeDefined()
+    expect(authorA.blogs).toBe('2')
+  })
+
+  test('Test 13d: Total likes are correctly calculated across author blogs', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Blog 1', author: 'Author A', likes: 10 })
+    await createBlog(user, { title: 'Blog 2', author: 'Author A', likes: 20 })
+
+    const response = await request(app)
+      .get('/api/authors')
+      .expect(200)
+
+    const authorA = response.body.find(a => a.author === 'Author A')
+    expect(authorA).toBeDefined()
+    expect(authorA.likes).toBe('30')
+  })
+
+  test('Test 13d2: Separate grouping for different authors', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Blog A', author: 'Author A', likes: 10 })
+    await createBlog(user, { title: 'Blog B', author: 'Author B', likes: 20 })
+
+    const response = await request(app)
+      .get('/api/authors')
+      .expect(200)
+
+    const authors = response.body
+    expect(authors.length).toBe(2)
+    const authorA = authors.find(a => a.author === 'Author A')
+    const authorB = authors.find(a => a.author === 'Author B')
+    expect(authorA).toBeDefined()
+    expect(authorB).toBeDefined()
+    expect(authorA.blogs).toBe('1')
+    expect(authorB.blogs).toBe('1')
+  })
+
+  test('Test 13e: Author with zero likes is handled correctly', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Blog A', author: 'Author A', likes: 0 })
+
+    const response = await request(app)
+      .get('/api/authors')
+      .expect(200)
+
+    const authorA = response.body.find(a => a.author === 'Author A')
+    expect(authorA).toBeDefined()
+    expect(authorA.blogs).toBe('1')
+    expect(authorA.likes).toBe('0')
+  })
+
+  test('Test 13f: Empty array when there are no blogs', async () => {
+    const { user, token } = await createUserAndToken()
+
+    const response = await request(app)
+      .get('/api/authors')
+      .expect(200)
+
+    expect(Array.isArray(response.body)).toBe(true)
+    expect(response.body.length).toBe(0)
+  })
+
+  test('Test 13g: Results ordered by total likes descending (bonus)', async () => {
+    const { user, token } = await createUserAndToken()
+    await createBlog(user, { title: 'Blog A', author: 'Author A', likes: 5 })
+    await createBlog(user, { title: 'Blog B', author: 'Author B', likes: 20 })
+    await createBlog(user, { title: 'Blog C', author: 'Author C', likes: 10 })
+
+    const response = await request(app)
+      .get('/api/authors')
+      .expect(200)
+
+    expect(response.body[0].author).toBe('Author B')
+    expect(response.body[0].likes).toBe('20')
+    expect(response.body[1].author).toBe('Author C')
+    expect(response.body[1].likes).toBe('10')
+    expect(response.body[2].author).toBe('Author A')
+    expect(response.body[2].likes).toBe('5')
+  })
 })
