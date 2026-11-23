@@ -1,4 +1,9 @@
-require('dotenv').config({ path: process.env.NODE_ENV === 'test' ? '.env.test' : '.env' })
+const isTestEnvironment =
+  process.env.NODE_ENV === 'test' || process.env.TESTING === 'true'
+
+require('dotenv').config({
+  path: isTestEnvironment ? '.env.test' : '.env'
+})
 
 const {
   DB_NAME,
@@ -7,7 +12,9 @@ const {
   DB_HOST,
   DB_PORT,
   PORT,
-  SECRET
+  SECRET,
+  TEST_DATABASE_URL,
+  DATABASE_URL
 } = process.env
 
 module.exports = {
@@ -17,5 +24,7 @@ module.exports = {
   DB_HOST,
   DB_PORT,
   PORT,
-  SECRET
+  SECRET,
+  TEST_DATABASE_URL,
+  DATABASE_URL
 }

@@ -3,8 +3,7 @@ const jwt = require('jsonwebtoken')
 const config = require('./util/config')
 const { sequelize, connectToDatabase } = require('./util/db')
 const { Sequelize } = require('sequelize')
-const User = require('./models/user')
-const Blog = require('./models/blog')
+const { User, Blog } = require('./models')
 const blogsRouter = require('./controllers/blogs')
 const usersRouter = require('./controllers/users')
 
@@ -13,6 +12,11 @@ const app = express()
 app.use(express.json())
 app.use('/api/blogs', blogsRouter)
 app.use('/api/users', usersRouter)
+
+// GET / - root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({ message: 'Blog API is running' })
+})
 
 // Login route
 app.post('/api/login', async (req, res, next) => {
@@ -61,6 +65,28 @@ app.get('/api/authors', async (req, res, next) => {
   }
 })
 
+// POST /api/reset - reset database tables (test environment only)
+app.post('/api/reset', async (req, res, next) => {
+  try {
+    // Only allow reset in test environment
+    if (process.env.TESTING !== 'true') {
+      return res.status(403).json({ error: 'Database reset is only available in test environment' })
+    }
+
+    // Use a transaction to ensure atomicity and proper order
+    const transaction = await sequelize.transaction(async (t) => {
+      // Delete all blogs first (they reference users via userId foreign key)
+      await Blog.destroy({ where: {}, transaction: t })
+      // Then delete all users
+      await User.destroy({ where: {}, transaction: t })
+    })
+
+    res.status(200).json({ message: 'Database reset successfully' })
+  } catch (error) {
+    next(error)
+  }
+})
+
 // Centralized error handling middleware
 const { errorHandler } = require('./util/middleware')
 app.use(errorHandler)
@@ -69,8 +95,8 @@ app.use(errorHandler)
 const start = async () => {
   try {
     await connectToDatabase()
-    await User.sync()
-    console.log('User table synchronized successfully')
+    await sequelize.sync()
+    console.log('Database tables synchronized successfully')
     app.listen(config.PORT || 3001, () => {
       console.log(`Server running on port ${config.PORT || 3001}`)
     })

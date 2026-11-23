@@ -1,5 +1,5 @@
-
 .ai-code-tracker.json
 .env
-node_modules/.env.test
+node_modules/
+*.log
 .env.test
